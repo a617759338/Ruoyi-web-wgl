@@ -38,17 +38,23 @@ export default defineConfig(({ mode, command }) => {
         }
       }
     },
-    // vite 相关配置
+// vite 相关配置
     server: {
       port: 8098,
       host: true,
       open: true,
       proxy: {
-        // https://cn.vitejs.dev/config/#server-proxy
-        '/dev-api': {
+        // 规则1：默认后端 → 虚拟机网关
+        '/dev-wgl-api': {
           target: 'http://localhost:8080',
           changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/dev-api/, '')
+          rewrite: (p) => p.replace(/^\/dev-wgl-api/, '')
+        },
+        // 规则2：你自定义的路由 → 也指向虚拟机网关
+        '/dev-api': {
+          target: 'http://192.168.222.128:8080',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/dev-api/, '')
         }
       }
     },
