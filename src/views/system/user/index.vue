@@ -20,8 +20,8 @@
         <pane size="84">
           <el-col>
             <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-              <el-form-item label="用户名称" prop="userName">
-                <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable style="width: 240px"
+              <el-form-item label="登录名" prop="userName">
+                <el-input v-model="queryParams.userName" placeholder="请输入登录名" clearable style="width: 240px"
                           @keyup.enter="handleQuery"/>
               </el-form-item>
               <el-form-item label="手机号码" prop="phonenumber">
@@ -78,9 +78,9 @@
                                v-if="columns.userId.visible"/>
               <el-table-column label="用户工号" align="center" key="workCode" prop="workCode"
                                v-if="columns.workCode.visible"/>
-              <el-table-column label="用户名称" align="center" key="userName" prop="userName"
+              <el-table-column label="登录名" align="center" key="userName" prop="userName"
                                v-if="columns.userName.visible" :show-overflow-tooltip="true"/>
-              <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName"
+              <el-table-column label="姓名" align="center" key="nickName" prop="nickName"
                                v-if="columns.nickName.visible" :show-overflow-tooltip="true"/>
               <el-table-column label="直接上级" align="center" key="superior" prop="superior"
                                v-if="columns.superior.visible" :show-overflow-tooltip="true">
@@ -144,8 +144,8 @@
       <el-form :model="form" :rules="rules" ref="userRef" label-width="80px">
         <el-row>
           <el-col :span="12">
-            <el-form-item label="用户昵称" prop="nickName">
-              <el-input v-model="form.nickName" placeholder="请输入用户昵称" maxlength="30"/>
+            <el-form-item label="姓名" prop="nickName">
+              <el-input v-model="form.nickName" placeholder="请输入姓名" maxlength="30"/>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -204,8 +204,8 @@
         </el-row>
         <el-row>
           <el-col :span="12">
-            <el-form-item v-if="form.userId == undefined" label="用户名称" prop="userName">
-              <el-input v-model="form.userName" placeholder="请输入用户名称" maxlength="30"/>
+            <el-form-item v-if="form.userId == undefined" label="登录名" prop="userName">
+              <el-input v-model="form.userName" placeholder="请输入登录名" maxlength="30"/>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -356,8 +356,8 @@ const upload = reactive({
 const columns = ref({
   userId: {label: '用户编号', visible: true},
   workCode: {label: '用户工号', visible: true},
-  userName: {label: '用户名称', visible: true},
-  nickName: {label: '用户昵称', visible: true},
+  userName: {label: '登录名', visible: true},
+  nickName: {label: '姓名', visible: true},
   superior: {label: '直接上级', visible: true},
   deptName: {label: '部门', visible: true},
   phonenumber: {label: '手机号码', visible: true},
@@ -376,13 +376,13 @@ const data = reactive({
     deptId: undefined
   },
   rules: {
-    userName: [{required: true, message: "用户名称不能为空", trigger: "blur"}, {
+    userName: [{required: true, message: "登录名不能为空", trigger: "blur"}, {
       min: 2,
       max: 20,
-      message: "用户名称长度必须介于 2 和 20 之间",
+      message: "登录名长度必须介于 2 和 20 之间",
       trigger: "blur"
     }],
-    nickName: [{required: true, message: "用户昵称不能为空", trigger: "blur"}],
+    nickName: [{required: true, message: "姓名不能为空", trigger: "blur"}],
     workCode: [{required: true, message: "用户工号不能为空", trigger: "blur"}],
     password: [{required: true, message: "用户密码不能为空", trigger: "blur"}, {
       min: 5,
