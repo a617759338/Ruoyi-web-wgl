@@ -85,10 +85,7 @@
               <el-table-column label="直接上级" align="center" key="superior" prop="superior"
                                v-if="columns.superior.visible" :show-overflow-tooltip="true">
                 <template #default="scope">
-                  <!-- 核心：通过工号找到对应用户名 -->
-                  <span>{{
-                      allUserList.find(item => item.workCode == scope.row.superior)?.nickName || scope.row.superior
-                    }}</span>
+                  <span>{{ getUserNameByWorkCode(scope.row.superior) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName"
@@ -154,7 +151,7 @@
             </el-form-item>
           </el-col>
 
-          <!-- ====================== 【修改1】直接上级改为单选下拉，存工号 ====================== -->
+          <!-- 直接上级选择 -->
           <el-col :span="12">
             <el-form-item label="直接上级" prop="superior">
               <el-select
@@ -162,17 +159,10 @@
                   placeholder="请选择直接上级"
                   style="width: 100%"
                   clearable
+                  filterable
               >
-                <!-- 👇 核心：强制把选中的值显示为名字 -->
-                <template #selected-item="{ value }">
-        <span>
-          {{ allUserList.find(item => item.workCode == value)?.userName || value }}
-        </span>
-                </template>
-
-                <!-- 👇 你的原有代码完全不动 -->
                 <el-option
-                    v-for="item in allUserList"
+                    v-for="item in availableSuperiors"
                     :key="item.workCode"
                     :label="`${item.nickName}（${item.workCode}）`"
                     :value="item.workCode"
@@ -180,7 +170,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <!-- ====================== 修改1结束 ====================== -->
 
           <el-col :span="12">
             <el-form-item label="归属部门" prop="deptId">
@@ -318,13 +307,18 @@ import {
 import {Splitpanes, Pane} from "splitpanes"
 import "splitpanes/dist/splitpanes.css"
 
+// ==================== 常量定义 ====================
+const DEFAULT_PAGE_SIZE = 999
+const SUPER_ADMIN_ID = 1
+
+// ==================== 依赖注入 ====================
 const router = useRouter()
 const appStore = useAppStore()
 const {proxy} = getCurrentInstance()
 const {sys_normal_disable, sys_user_sex} = proxy.useDict("sys_normal_disable", "sys_user_sex")
 
+// ==================== 响应式数据 ====================
 const userList = ref([])
-// ====================== 【修改2】定义全部用户列表 ======================
 const allUserList = ref([])
 const open = ref(false)
 const loading = ref(true)
@@ -342,14 +336,15 @@ const initPassword = ref(undefined)
 const postOptions = ref([])
 const roleOptions = ref([])
 
-/*** 用户导入参数 */
+// 用户导入参数
 const upload = reactive({
   open: false,
   title: "",
   isUploading: false,
   updateSupport: 0,
   headers: {Authorization: "Bearer " + getToken()},
-  url: import.meta.env.VITE_APP_BASE_API + "/system/user/importData"
+  url: import.meta.env.VITE_APP_BASE_API + "/system/user/importData",
+  selectedFile: null
 })
 
 // 列显隐信息
@@ -365,6 +360,7 @@ const columns = ref({
   createTime: {label: '创建时间', visible: true}
 })
 
+// 表单数据
 const data = reactive({
   form: {},
   queryParams: {
@@ -376,20 +372,17 @@ const data = reactive({
     deptId: undefined
   },
   rules: {
-    userName: [{required: true, message: "登录名不能为空", trigger: "blur"}, {
-      min: 2,
-      max: 20,
-      message: "登录名长度必须介于 2 和 20 之间",
-      trigger: "blur"
-    }],
+    userName: [
+      {required: true, message: "登录名不能为空", trigger: "blur"},
+      {min: 2, max: 20, message: "登录名长度必须介于 2 和 20 之间", trigger: "blur"}
+    ],
     nickName: [{required: true, message: "姓名不能为空", trigger: "blur"}],
     workCode: [{required: true, message: "用户工号不能为空", trigger: "blur"}],
-    password: [{required: true, message: "用户密码不能为空", trigger: "blur"}, {
-      min: 5,
-      max: 20,
-      message: "用户密码长度必须介于 5 和 20 之间",
-      trigger: "blur"
-    }, {pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\\ |", trigger: "blur"}],
+    password: [
+      {required: true, message: "用户密码不能为空", trigger: "blur"},
+      {min: 5, max: 20, message: "用户密码长度必须介于 5 和 20 之间", trigger: "blur"},
+      {pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\\ |", trigger: "blur"}
+    ],
     email: [{type: "email", message: "请输入正确的邮箱地址", trigger: ["blur", "change"]}],
     phonenumber: [{pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/, message: "请输入正确的手机号码", trigger: "blur"}]
   }
@@ -397,40 +390,74 @@ const data = reactive({
 
 const {queryParams, form, rules} = toRefs(data)
 
-/** 通过条件过滤节点  */
+// ==================== 计算属性 ====================
+/** 可用的上级列表（排除当前编辑的用户自己） */
+const availableSuperiors = computed(() => {
+  if (!form.value.userId) {
+    return allUserList.value
+  }
+  const currentWorkCode = form.value.workCode
+  return allUserList.value.filter(item => item.workCode !== currentWorkCode)
+})
+
+// ==================== 工具方法 ====================
+/** 根据工号获取用户姓名 */
+const getUserNameByWorkCode = (workCode) => {
+  if (!workCode) return ''
+  const user = allUserList.value.find(item => item.workCode == workCode)
+  return user?.nickName || workCode
+}
+
+/** 通过条件过滤节点 */
 const filterNode = (value, data) => {
   if (!value) return true
   return data.label.indexOf(value) !== -1
 }
 
+// ==================== 监听器 ====================
 /** 根据名称筛选部门树 */
 watch(deptName, val => {
-  proxy.$refs["deptTreeRef"].filter(val)
+  proxy.$refs["deptTreeRef"]?.filter(val)
 })
 
+// ==================== 数据查询方法 ====================
 /** 查询用户列表 */
 function getList() {
   loading.value = true
-  listUser(proxy.addDateRange(queryParams.value, dateRange.value)).then(res => {
-    loading.value = false
-    userList.value = res.rows
-    total.value = res.total
-  })
+  listUser(proxy.addDateRange(queryParams.value, dateRange.value))
+    .then(res => {
+      userList.value = res.rows
+      total.value = res.total
+    })
+    .catch(error => {
+      proxy.$modal.msgError("查询失败：" + (error.msg || "未知错误"))
+    })
+    .finally(() => {
+      loading.value = false
+    })
 }
 
-// ====================== 【修改3】获取全部启用用户，用于上级选择 ======================
+/** 获取全部启用用户列表 */
 function getAllUserList() {
-  listUser({pageNum: 1, pageSize: 999, status: "0"}).then(res => {
-    allUserList.value = res.rows
-  })
+  listUser({pageNum: 1, pageSize: DEFAULT_PAGE_SIZE, status: "0"})
+    .then(res => {
+      allUserList.value = res.rows || []
+    })
+    .catch(error => {
+      console.error("获取用户列表失败:", error)
+    })
 }
 
 /** 查询部门下拉树结构 */
 function getDeptTree() {
-  deptTreeSelect().then(response => {
-    deptOptions.value = response.data
-    enabledDeptOptions.value = filterDisabledDept(JSON.parse(JSON.stringify(response.data)))
-  })
+  deptTreeSelect()
+    .then(response => {
+      deptOptions.value = response.data
+      enabledDeptOptions.value = filterDisabledDept(JSON.parse(JSON.stringify(response.data)))
+    })
+    .catch(error => {
+      proxy.$modal.msgError("获取部门树失败：" + (error.msg || "未知错误"))
+    })
 }
 
 /** 过滤禁用的部门 */
@@ -446,6 +473,7 @@ function filterDisabledDept(deptList) {
   })
 }
 
+// ==================== 事件处理方法 ====================
 /** 节点单击事件 */
 function handleNodeClick(data) {
   queryParams.value.deptId = data.id
@@ -463,20 +491,23 @@ function resetQuery() {
   dateRange.value = []
   proxy.resetForm("queryRef")
   queryParams.value.deptId = undefined
-  proxy.$refs.deptTreeRef.setCurrentKey(null)
+  proxy.$refs.deptTreeRef?.setCurrentKey(null)
   handleQuery()
 }
 
 /** 删除按钮操作 */
 function handleDelete(row) {
   const userIds = row.userId || ids.value
-  proxy.$modal.confirm('是否确认删除用户编号为"' + userIds + '"的数据项？').then(function () {
-    return delUser(userIds)
-  }).then(() => {
-    getList()
-    proxy.$modal.msgSuccess("删除成功")
-  }).catch(() => {
-  })
+  proxy.$modal.confirm('是否确认删除用户编号为"' + userIds + '"的数据项？')
+    .then(function () {
+      return delUser(userIds)
+    })
+    .then(() => {
+      getList()
+      getAllUserList() // 刷新用户列表以更新上级选择
+      proxy.$modal.msgSuccess("删除成功")
+    })
+    .catch(() => {})
 }
 
 /** 导出按钮操作 */
@@ -486,22 +517,24 @@ function handleExport() {
   }, `user_${new Date().getTime()}.xlsx`)
 }
 
-/** 用户状态修改  */
+/** 用户状态修改 */
 function handleStatusChange(row) {
   let text = row.status === "0" ? "启用" : "停用"
-  proxy.$modal.confirm('确认要"' + text + '""' + row.userName + '"用户吗?').then(function () {
-    return changeUserStatus(row.userId, row.status)
-  }).then(() => {
-    proxy.$modal.msgSuccess(text + "成功")
-  }).catch(function () {
-    row.status = row.status === "0" ? "1" : "0"
-  })
+  proxy.$modal.confirm('确认要"' + text + '""' + row.userName + '"用户吗?')
+    .then(function () {
+      return changeUserStatus(row.userId, row.status)
+    })
+    .then(() => {
+      proxy.$modal.msgSuccess(text + "成功")
+    })
+    .catch(function () {
+      row.status = row.status === "0" ? "1" : "0"
+    })
 }
 
 /** 跳转角色分配 */
 function handleAuthRole(row) {
-  const userId = row.userId
-  router.push("/system/user-auth/role/" + userId)
+  router.push("/system/user-auth/role/" + row.userId)
 }
 
 /** 重置密码按钮操作 */
@@ -517,21 +550,24 @@ function handleResetPwd(row) {
         return "不能包含非法字符：< > \" ' \\\ |"
       }
     },
-  }).then(({value}) => {
-    resetUserPwd(row.userId, value).then(response => {
-      proxy.$modal.msgSuccess("修改成功，新密码是：" + value)
-    })
-  }).catch(() => {
   })
+    .then(({value}) => {
+      return resetUserPwd(row.userId, value)
+    })
+    .then(() => {
+      proxy.$modal.msgSuccess("修改成功")
+    })
+    .catch(() => {})
 }
 
-/** 选择条数  */
+/** 选择条数 */
 function handleSelectionChange(selection) {
   ids.value = selection.map(item => item.userId)
   single.value = selection.length != 1
   multiple.value = !selection.length
 }
 
+// ==================== 导入相关方法 ====================
 /** 导入按钮操作 */
 function handleImport() {
   upload.title = "用户导入"
@@ -544,7 +580,7 @@ function importTemplate() {
   proxy.download("system/user/importTemplate", {}, `user_template_${new Date().getTime()}.xlsx`)
 }
 
-/**文件上传中处理 */
+/** 文件上传中处理 */
 const handleFileUploadProgress = (event, file, fileList) => {
   upload.isUploading = true
 }
@@ -563,9 +599,10 @@ const handleFileRemove = (file, fileList) => {
 const handleFileSuccess = (response, file, fileList) => {
   upload.open = false
   upload.isUploading = false
-  proxy.$refs["uploadRef"].handleRemove(file)
+  proxy.$refs["uploadRef"]?.handleRemove(file)
   proxy.$alert("<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + response.msg + "</div>", "导入结果", {dangerouslyUseHTMLString: true})
   getList()
+  getAllUserList() // 刷新用户列表
 }
 
 /** 提交上传文件 */
@@ -575,9 +612,10 @@ function submitFileForm() {
     proxy.$modal.msgError("请选择后缀为 xls 或 xlsx 的文件。")
     return
   }
-  proxy.$refs["uploadRef"].submit()
+  proxy.$refs["uploadRef"]?.submit()
 }
 
+// ==================== 表单操作方法 ====================
 /** 重置操作表单 */
 function reset() {
   form.value = {
@@ -593,7 +631,6 @@ function reset() {
     remark: undefined,
     postIds: [],
     roleIds: [],
-    // ====================== 【修改4】重置时清空直接上级（工号） ======================
     superior: ""
   }
   proxy.resetForm("userRef")
@@ -608,61 +645,72 @@ function cancel() {
 /** 新增按钮操作 */
 function handleAdd() {
   reset()
-  getUser().then(response => {
-    postOptions.value = response.posts
-    roleOptions.value = response.roles
-    open.value = true
-    title.value = "添加用户"
-    form.value.password = initPassword.value
-  })
+  getUser()
+    .then(response => {
+      postOptions.value = response.posts
+      roleOptions.value = response.roles
+      open.value = true
+      title.value = "添加用户"
+      form.value.password = initPassword.value
+    })
+    .catch(error => {
+      proxy.$modal.msgError("获取用户信息失败：" + (error.msg || "未知错误"))
+    })
 }
 
 /** 修改按钮操作 */
 function handleUpdate(row) {
   reset()
   const userId = row.userId || ids.value
-  getUser(userId).then(response => {
-    form.value = response.data
-    postOptions.value = response.posts
-    roleOptions.value = response.roles
-    form.value.postIds = response.postIds
-    form.value.roleIds = response.roleIds
-    // ====================== 【修改5】编辑自动回显工号 ======================
-    form.value.superior = response.data.superior
-    open.value = true
-    title.value = "修改用户"
-    form.value.password = ""
-  })
+  getUser(userId)
+    .then(response => {
+      form.value = response.data
+      postOptions.value = response.posts
+      roleOptions.value = response.roles
+      form.value.postIds = response.postIds
+      form.value.roleIds = response.roleIds
+      form.value.superior = response.data.superior
+      open.value = true
+      title.value = "修改用户"
+      form.value.password = ""
+    })
+    .catch(error => {
+      proxy.$modal.msgError("获取用户信息失败：" + (error.msg || "未知错误"))
+    })
 }
 
 /** 提交按钮 */
 function submitForm() {
   proxy.$refs["userRef"].validate(valid => {
     if (valid) {
-      if (form.value.userId != undefined) {
-        updateUser(form.value).then(response => {
-          proxy.$modal.msgSuccess("修改成功")
+      const apiMethod = form.value.userId != undefined ? updateUser : addUser
+      const successMsg = form.value.userId != undefined ? "修改成功" : "新增成功"
+
+      apiMethod(form.value)
+        .then(() => {
+          proxy.$modal.msgSuccess(successMsg)
           open.value = false
           getList()
+          getAllUserList() // 刷新用户列表以更新上级选择
         })
-      } else {
-        addUser(form.value).then(response => {
-          proxy.$modal.msgSuccess("新增成功")
-          open.value = false
-          getList()
+        .catch(error => {
+          proxy.$modal.msgError("操作失败：" + (error.msg || "未知错误"))
         })
-      }
     }
   })
 }
 
+// ==================== 生命周期 ====================
 onMounted(() => {
   getDeptTree()
   getList()
-  // ====================== 【修改6】页面加载时加载用户列表用于选择 ======================
   getAllUserList()
-  proxy.getConfigKey("sys.user.initPassword").then(response => {
-    initPassword.value = response.msg
-  })
+  proxy.getConfigKey("sys.user.initPassword")
+    .then(response => {
+      initPassword.value = response.msg
+    })
+    .catch(error => {
+      console.error("获取初始密码配置失败:", error)
+    })
 })
 </script>
