@@ -21,13 +21,13 @@
               type="primary"
               icon="Cloudy"
               plain
-              @click="goTarget('https://www.repower.com.cn')"
+              @click="goTarget('https://www.repower.cn')"
           >访问官网</el-button
           >
           <el-button
               icon="HomeFilled"
               plain
-              @click="goTarget('https://www.repower.com.cn')"
+              @click="goTarget('https://www.repower.cn')"
           >了解更多</el-button
           >
         </p>
