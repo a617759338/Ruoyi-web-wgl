@@ -1,5 +1,4 @@
 import request from '@/utils/request'
-
 // 查询部门列表
 export function listDept(query) {
   return request({
@@ -8,7 +7,6 @@ export function listDept(query) {
     params: query
   })
 }
-
 // 查询部门列表（排除节点）
 export function listDeptExcludeChild(deptId) {
   return request({
@@ -16,15 +14,16 @@ export function listDeptExcludeChild(deptId) {
     method: 'get'
   })
 }
-
-// 查询部门详细
+// 查询部门详细【增加 _t 时间戳防止GET缓存】
 export function getDept(deptId) {
   return request({
     url: '/system/dept/' + deptId,
-    method: 'get'
+    method: 'get',
+    params: {
+      _t: Date.now()
+    }
   })
 }
-
 // 新增部门
 export function addDept(data) {
   return request({
@@ -33,7 +32,6 @@ export function addDept(data) {
     data: data
   })
 }
-
 // 修改部门
 export function updateDept(data) {
   return request({

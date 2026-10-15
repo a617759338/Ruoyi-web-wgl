@@ -90,17 +90,17 @@
 </template>
 
 <script setup name="UserSelect">
-import {ref, reactive, watch, onMounted} from 'vue'
+import {ref, reactive, watch, onMounted, getCurrentInstance} from 'vue'
 import {Splitpanes, Pane} from "splitpanes"
 import "splitpanes/dist/splitpanes.css"
 import {listUser, deptTreeSelect} from "@/api/system/user"
 
 const {proxy} = getCurrentInstance()
 
-// 父组件控制显示
+// 父组件控制弹窗显示
 const visible = defineModel()
 
-// 选中回调
+// 向外抛出选中用户数组
 const emit = defineEmits(['change'])
 
 // 部门树
@@ -122,7 +122,7 @@ const queryParams = reactive({
   deptId: undefined,
 })
 
-// 部门筛选
+// 部门树过滤
 const filterNode = (value, data) => {
   if (!value) return true
   return data.label.includes(value)
@@ -132,7 +132,7 @@ watch(deptName, (val) => {
   deptTreeRef.value?.filter(val)
 })
 
-// 点击部门
+// 点击部门，加载该部门用户
 const handleNodeClick = (data) => {
   queryParams.deptId = data.id
   queryParams.pageNum = 1
@@ -146,7 +146,7 @@ const getDeptTree = () => {
   })
 }
 
-// 查询用户
+// 查询用户列表
 const getUserList = () => {
   loading.value = true
   listUser({...queryParams}).then(res => {
@@ -162,32 +162,18 @@ const handleQuery = () => {
   getUserList()
 }
 
-// 选择用户
+// 表格多选回调
 const handleSelectionChange = (val) => {
   selectedUsers.value = val
 }
 
-// 确认选择
+// =========核心修复：直接抛出完整用户数组给父组件=========
 const confirmSelect = () => {
-  // 工号：(1001,1002)
-  const workCodes = selectedUsers.value.map(u => u.workCode || u.userId)
-  const workCodeStr = workCodes.length ? `${workCodes.join(',')}` : ''
-
-  // 显示名：张三,李四
-  const userNames = selectedUsers.value.map(u => u.userName || u.nickName)
-  const userNameStr = userNames.join(',')
-
-  // 返回给父页面
-  emit('change', {
-    workCodeStr,    // 提交后台 (1001,1002)
-    userNameStr,    // 显示用 张三,李四
-    selectedUsers: selectedUsers.value
-  })
-
+  emit('change', selectedUsers.value)
   visible.value = false
 }
 
-// 重置
+// 重置查询条件
 const resetQuery = () => {
   queryParams.userName = undefined
   queryParams.workCode = undefined
