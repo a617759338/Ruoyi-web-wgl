@@ -76,7 +76,7 @@
           </template>
           <div class="body">
             <p>
-              <i class="el-icon-s-promotion"></i> 官网：<el-link
+              <i class="el-icon-s-promotion"></i> 官网:<el-link
                 href="https://www.repower.com.cn"
                 target="_blank"
             >https://www.repower.com.cn</el-link
